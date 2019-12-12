@@ -1,62 +1,189 @@
-// udp client driver program
 #include <stdio.h>
-#include <strings.h>
+#define _USE_BSD 1
+#include <string.h>
 #include <sys/types.h>
-#include <arpa/inet.h>
 #include <sys/socket.h>
-#include<netinet/in.h>
-#include<unistd.h>
-#include<stdlib.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <time.h>
+#include <fcntl.h>
 
-#define PORT 5000
+#define BUFSIZE 64
 
-// Driver code
-int main()
+#ifndef INADDR_NONE
+#define INADDR_NONE 0xffffffff
+#endif
+
+#define MAX_RECV_BUF 1000
+#define MAX_SEND_BUF 1000
+
+
+
+extern int errno;
+int errexit(const char *format,...);
+int connectUDP(const char *service,const char *host,int portnum);
+int connectsock(const char *service,const char *host,int portnum,const char *transport);
+
+/*------------------------------------------------------------------------------------
+ * connectsock-Allocate and connect socket for UDP
+ *------------------------------------------------------------------------------------
+*/
+
+int connectsock(const char *service,const char *host,int portnum,const char *transport)
 {
-    char buffer[100];
+printf("connectsock\n");
+/*
+Arguments:
+*service   - service associated with desired port
+*host      - name of the host to which connection is desired
+*transport - name of the transport protocol to use
+*/ 
 
-    char *inputText = NULL;
-    inputText = (char*)malloc(sizeof(char));
-    int numberOfSymbolsInText = 0;
-    char currentSymbol = fgetc(stdin);
+struct sockaddr_in sin; 					 //an internet endpoint address
+int s,type;               					 //socket descriptor and socket type 
 
-    while (currentSymbol != '\n')//чтение
-    {
-        inputText = (char *) realloc(inputText, (numberOfSymbolsInText + 1) * sizeof(char));
-        inputText[numberOfSymbolsInText] = currentSymbol;
-        currentSymbol = fgetc(stdin);
-        numberOfSymbolsInText++;
-    }
-    inputText[numberOfSymbolsInText] = currentSymbol;
+memset(&sin,0,sizeof(sin));  
+sin.sin_family=AF_INET;   				         //family name
+  
+sin.sin_port=htons(portnum);                                        //port number
 
-    int sockfd, n;
-    struct sockaddr_in servaddr;
 
-    // clear servaddr
-    bzero(&servaddr, sizeof(servaddr));
-    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    servaddr.sin_port = htons(PORT);
-    servaddr.sin_family = AF_INET;
+inet_pton(AF_INET,host,&(sin.sin_addr));                         //to convert host name into 32-bit IP address
+ 
+/*
+ * to determine the type of socket
+ */
 
-    // create datagram socket
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+if(strcmp(transport,"udp")==0)         
+type=SOCK_DGRAM;
+else
+type=SOCK_STREAM;
 
-    // connect to server
-    if(connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
-    {
-        printf("\n Error : Connect Failed \n");
-        exit(0);
-    }
+/* Allocate a socket */
 
-    // request to send datagram
-    // no need to specify server address in sendto
-    // connect stores the peers IP and port
-    sendto(sockfd, inputText, numberOfSymbolsInText, 0, (struct sockaddr*)NULL, sizeof(servaddr));
+s=socket(AF_INET,type,0);
 
-    // waiting for response
-    recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)NULL, NULL);
-    puts(buffer);
 
-    // close the descriptor
-    close(sockfd);
+if(s<0)
+errexit("can't create socket : %s\n",strerror(errno));
+
+
+if((connect(s,(struct sockaddr *) &sin,sizeof(sin)))<0)        //connect the socket 
+errexit("can't connect to %s.%s: %s\n",host,service,strerror(errno));
+
+
+return s;
+
+}
+
+/*
+ * errexit- print and error message and exit
+ */
+
+
+int errexit(const char* format,...)
+{
+    printf("errexit\n");
+va_list args;
+
+va_start(args,format);
+vfprintf(stderr,format,args);
+va_end(args);
+exit(1);
+}
+
+
+/*------------------------------------------------------------------------
+ * connectUDP-connect to a specified UDP service on specified host
+ -------------------------------------------------------------------------*/
+
+int connectUDP(const char *service,const char *host,int portnum)
+{
+    printf("connectUDP\n");
+/*
+ Arguments:
+ *service-service associated with desired port
+ *host-name of the host to which connection is desired
+ */
+
+return connectsock(service,host,portnum,"udp");
+}
+
+
+/*
+ main - UDP client file
+ */ 
+
+int main(int argc,char *argv[])
+{
+
+char *host;
+
+char *file_name;
+ssize_t recv_bytes;
+char recv_buff[1000];
+
+int portnum;
+char *service="time";                                               //default service port
+
+int s,n;                                                            //socket descriptor
+
+switch(argc)
+{
+case 1:
+host="localhost";
+printf("case 1\n");
+break;
+
+case 2:
+host="localhost";
+printf("case 2\n");
+break;
+
+case 4:
+    printf("case 1\n");
+    file_name=argv[3];
+    portnum=atoi(argv[2]);
+    host=argv[1];
+break;
+
+default:
+    printf("Error in taking arguments\n");
+    exit(1);
+
+}
+
+struct sockaddr_in fsin;                                       
+
+size_t alen;
+alen=sizeof(fsin);
+s=connectUDP(service,host,portnum);                                        
+
+
+send(s,file_name,MAX_SEND_BUF,0);                                  
+int ptr;
+
+
+
+while((recv_bytes=recv(s,recv_buff,MAX_RECV_BUF,0))>0)
+{
+    printf("while\n");
+if((ptr=open(file_name,O_WRONLY|O_CREAT,0644))<0)
+{
+ printf("error in writing to file\n");
+}
+
+printf("%s\n",recv_buff);
+write(ptr,recv_buff,recv_bytes);    
+close(s);                    
+}
+
+
+exit(0);
+
 }

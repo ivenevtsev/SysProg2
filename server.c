@@ -1,164 +1,209 @@
-// server program for udp connection
 #include <stdio.h>
-#include <strings.h>
+#define _USE_BSD 1
+#include <string.h>
 #include <sys/types.h>
-#include <arpa/inet.h>
 #include <sys/socket.h>
-#include<netinet/in.h>
-#include <math.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <stdarg.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <time.h>
+#include <math.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 
-#define PORT 5000
-#define MAXLINE 1000
-//1 - не 6 кординат
-//2 не числа, не правильный формат введенных данных
-// не треугольник
-//
+#define MAX_SEND_BUF 1000
+#define MAX_RECV_BUF 1000
+#define MAX_DATA 1000
 
-void reverse(char* str, int len)
+
+extern int errno;
+
+int errexit(const char *format,...);
+int connectUDP(const char *service,int portnum);
+int connectsock(const char *service,int portnum,const char *transport);
+void handler(int);
+
+/*------------------------------------------------------------------------------------
+ * connectsock-Allocate and connect socket for UDP
+ *------------------------------------------------------------------------------------
+*/
+
+int connectsock(const char *service,int portnum,const char *transport)
 {
-    int i = 0, j = len - 1, temp;
-    while (i < j) {
-        temp = str[i];
-        str[i] = str[j];
-        str[j] = temp;
-        i++;
-        j--;
+/*
+Arguments:
+*service   - service associated with desired port
+*transport - name of the transport protocol to use
+*/
+    printf("connectsock\n");
+    struct sockaddr_in server;                                                //an internet endpoint address
+
+    int server_socket,type,b,l,accept_socket,num;                             //two socket descriptors for listening and accepting
+
+    memset(&server,0,sizeof(server));
+
+    server.sin_addr.s_addr=htons(INADDR_ANY);                                 //INADDR_ANY to match any IP address
+    server.sin_family=AF_INET;                                                //family name
+    server.sin_port=htons(portnum);                                              //port number
+/*
+ * to determine the type of socket
+ */  type=SOCK_DGRAM;
+
+    server_socket = socket(AF_INET,type,0);                                    //allocate a socket
+
+    if(server_socket<0)
+    {
+        printf("Socket can't be created\n");
+        exit(0);
     }
+
+/* to set the socket options- to reuse the given port multiple times */
+    int enable = 1;
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        printf("setsockopt(SO_REUSEADDR) failed");
+        exit(0);
+    }
+
+/* bind the socket to known port */
+    b=bind(server_socket,(struct sockaddr*)&server,sizeof(server));
+
+    if(b<0)
+    {
+        printf("Error in binding\n");
+        exit(0);
+    }
+
+    return server_socket;
+
 }
 
-int intToStr(int x, char str[], int d)
+
+/*------------------------------------------------------------------------
+ * connectUDP-connect to a specified UDP service on specified host
+ -------------------------------------------------------------------------*/
+int connectUDP(const char *service,int portnum)
 {
-    int i = 0;
-    while (x) {
-        str[i++] = (x % 10) + '0';
-        x = x / 10;
-    }
+    printf("connectUDP\n");
+/*
+ Arguments:
+ *service-service associated with desired port
+ */
+    return connectsock(service, portnum, "udp");
 
-    while (i < d)
-        str[i++] = '0';
-
-    reverse(str, i);
-    str[i] = '\0';
-    return i;
 }
 
-// Converts a floating-point/double number to a string.
-void ftoa(float n, char* res, int afterpoint)
+
+void handler(int sig)
 {
-    // Extract integer part
-    int ipart = (int)n;
-
-    // Extract floating part
-    float fpart = n - (float)ipart;
-
-    // convert integer part to string
-    int i = intToStr(ipart, res, 0);
-
-    // check for display option after point
-    if (afterpoint != 0) {
-        res[i] = '.'; // add dot
-
-        fpart = fpart * pow(10, afterpoint);
-
-        intToStr((int)fpart, res + i + 1, afterpoint);
-    }
+    printf("handler\n");
+    int status;
+    while(wait3(&status,WNOHANG,(struct rusage *)0)>=0);
 }
 
-struct TriangleSidesCoordinates{
-    int errorCode;
-    double coordinates[6];
-};
 
-struct TriangleSidesCoordinates proceedLineToCoordinates(char * line){
-    struct TriangleSidesCoordinates currentTriangleSidesCoordinates;
-    int numberOfCoordinates = 0;
-    printf("%s\n", line);
-    int i = 0;
-    while (line[i] != '\n'){
-        if (numberOfCoordinates == 6){
-            currentTriangleSidesCoordinates.errorCode = 1;
-            break;
+int errexit(const char* format,...)
+{
+    va_list args;
+
+    va_start(args,format);
+    vfprintf(stderr,format,args);
+    va_end(args);
+    exit(1);
+}
+
+
+/*
+ main - connectionless multiprocess server 
+ */
+
+int main(int argc,char *argv[]){
+    char *service = "echo";
+
+    int portnum = atoi(argv[1]);
+
+    int msock;
+    char data[1000];
+    char send_buf[MAX_SEND_BUF];
+    int file;
+    /* call connectTCP to create a socket, bind it and place it in passive mode
+       once the call returns call accept on listening socket to accept the incoming requests
+     */
+
+    msock = connectUDP(service, portnum);
+    printf("Listening to client\n");
+
+    (void) signal(SIGCHLD, handler);
+
+
+    while (1) {
+        struct sockaddr_in fsin;
+        printf("while%s\n");
+        int alen = sizeof(fsin);
+
+        int data_len;
+
+        data_len = recvfrom(msock, data, MAX_DATA, 0, (struct sockaddr *) &fsin, &alen);
+
+
+        if (data_len) {
+            printf("connected to multiforked connectionless server\n");
+            printf("File name recieved: %s\n", data);
+
+            int pid;
+            int x;
+
+            int file;
+
+            switch (fork()) {
+                case 0: /* child */
+                    if ((file = open(data, O_RDONLY)) < 0) {
+
+                        printf("File not found\n");
+                        printf("Client disconnected\n");
+                    } else {
+
+                        printf("File opened successfully\n");
+
+
+                        ssize_t read_bytes;
+                        ssize_t sent_bytes;
+
+                        char send_buf[MAX_SEND_BUF];
+
+
+                        while ((read_bytes = read(file, send_buf, MAX_RECV_BUF)) > 0) {
+
+                            printf("%s", send_buf);
+
+
+                            if ((sent_bytes = sendto(msock, send_buf, read_bytes, 0, (struct sockaddr *) &fsin,
+                                                     sizeof(fsin)) < read_bytes)) {
+                                printf("send error\n");
+                                return -1;
+                            }
+                        }
+                        close(file);
+                        printf("\nclient disconnected\n");
+                    }
+
+
+                default: /* parent */
+
+                    break;
+                case -1:
+                    printf("error in forking\n");
+            }
+
         }
-        char *currentNumber = NULL;
-        currentNumber = (char *) malloc(sizeof(char));
 
-        int numberOfSymbolsInWord = 0;
 
-        while (line[i] != ' ' ) {// доделать
-            currentNumber = (char *) realloc(currentNumber, (numberOfSymbolsInWord + 1) * sizeof(char));
-            currentNumber[numberOfSymbolsInWord] = line[i];
-
-            ++numberOfSymbolsInWord;
-            ++i;
-        }
-
-        currentNumber = (char *) realloc(currentNumber, (numberOfSymbolsInWord + 1) * sizeof(char));
-        currentNumber[numberOfSymbolsInWord] = '\0';
-        printf("%s\n", currentNumber);
-        //logic of transforming string to number
-        double number = strtod(currentNumber, '\0');
-        currentTriangleSidesCoordinates.coordinates[numberOfCoordinates] = number;
-        printf("%lf\n", number);
-        ++numberOfCoordinates;
-        ++i;
     }
-    //обрабатать что мб не числа
-    if (numberOfCoordinates != 6){
-        currentTriangleSidesCoordinates.errorCode = 1;
-    }
-    return currentTriangleSidesCoordinates;
-}
 
 
-double getSquare(struct TriangleSidesCoordinates triangle){
-    double S = 0;
-    double x1 = triangle.coordinates[0];
-    double y1 = triangle.coordinates[1];
-    double x2 = triangle.coordinates[2];
-    double y2 = triangle.coordinates[3];
-    double x3 = triangle.coordinates[4];
-    double y3 = triangle.coordinates[5];
-
-    S = 0.5 * abs((x2 - x1)*(y3 - y1) - (x3 - x1)*(y2 - y1));
-
-    return S;
-}
-
-
-
-// Driver code
-int main()
-{
-    char buffer[400];
-    char *message;
-    message = (char *) malloc(15 * sizeof(char));
-    int listenfd, len;
-    struct sockaddr_in servaddr, cliaddr;
-    bzero(&servaddr, sizeof(servaddr));
-
-    // Create a UDP Socket
-    listenfd = socket(AF_INET, SOCK_DGRAM, 0);
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(PORT);
-    servaddr.sin_family = AF_INET;
-
-    // bind server address to socket descriptor
-    bind(listenfd, (struct sockaddr*)&servaddr, sizeof(servaddr));
-
-    //receive the datagram
-    len = sizeof(cliaddr);
-    int n = recvfrom(listenfd, buffer, sizeof(buffer),
-                     0, (struct sockaddr*)&cliaddr, &len); //receive message from server
-    buffer[n] = '\0';
-    printf("%s\n", buffer);
-
-
-    double S = getSquare(proceedLineToCoordinates(buffer));
-    printf("%lf", S);
-    ftoa(S, message, 10);
-    printf("%s\n", message);
-    // send the response
-    sendto(listenfd, message, MAXLINE, 0,
-           (struct sockaddr*)&cliaddr, sizeof(cliaddr));
+    return 0;
 }

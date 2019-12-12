@@ -51,7 +51,7 @@ int main()
     // request to send datagram
     // no need to specify server address in sendto
     // connect stores the peers IP and port
-    sendto(sockfd, inputText, currentSymbol, 0, (struct sockaddr*)NULL, sizeof(servaddr));
+    sendto(sockfd, inputText, numberOfSymbolsInText, 0, (struct sockaddr*)NULL, sizeof(servaddr));
 
     // waiting for response
     recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)NULL, NULL);

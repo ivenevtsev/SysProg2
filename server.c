@@ -6,13 +6,14 @@
 #include <sys/socket.h>
 #include<netinet/in.h>
 #include <math.h>
+#include <string.h>
 #include <stdlib.h>
 
 #define PORT 5000
 #define MAXLINE 1000
 //1 - не 6 кординат
 //2 не числа, не правильный формат введенных данных
-// не треугольник
+// 3 не треугольник
 //
 
 void reverse(char* str, int len)
@@ -65,74 +66,96 @@ void ftoa(float n, char* res, int afterpoint)
     }
 }
 
-struct TriangleSidesCoordinates{
+struct Triangle{
     int errorCode;
     double coordinates[6];
+    double square;
 };
 
-struct TriangleSidesCoordinates proceedLineToCoordinates(char * line){
-    struct TriangleSidesCoordinates currentTriangleSidesCoordinates;
+struct Triangle proceedLineToCoordinates(char * line){
+    struct Triangle currentTriangle;
+    currentTriangle.errorCode = 0;
+    currentTriangle.square = 0.0;
+    for (int i = 0; i < 6; i++){
+        currentTriangle.coordinates[i] = 0;
+    }
     int numberOfCoordinates = 0;
     printf("%s\n", line);
-    int i = 0;
-    while (line[i] != '\n'){
+    int i = 0, maxi = strlen(line);
+    printf("%d - maxi\n", maxi);
+    while (printf("%d - tuc4\n", numberOfCoordinates) && i < maxi){ //&& line[i] != '\n' && line[i] != '\0'){
+        printf("%d - tuc4\n", numberOfCoordinates);
         if (numberOfCoordinates == 6){
-            currentTriangleSidesCoordinates.errorCode = 1;
+            currentTriangle.errorCode = 1;
             break;
         }
         char *currentNumber = NULL;
         currentNumber = (char *) malloc(sizeof(char));
 
         int numberOfSymbolsInWord = 0;
-
-        while (line[i] != ' ' ) {// доделать
+        printf("%d - i\n", i);
+        while (printf("%d - tuc3\n", numberOfCoordinates) && i < maxi && line[i] != ' ' && line[i] != '\n' && line[i] != '\0' ) {// доделать
+            printf("%d - tuc3\n", numberOfCoordinates);
             currentNumber = (char *) realloc(currentNumber, (numberOfSymbolsInWord + 1) * sizeof(char));
             currentNumber[numberOfSymbolsInWord] = line[i];
 
             ++numberOfSymbolsInWord;
             ++i;
+            printf("%d - tuc3\n", numberOfCoordinates);
         }
 
         currentNumber = (char *) realloc(currentNumber, (numberOfSymbolsInWord + 1) * sizeof(char));
         currentNumber[numberOfSymbolsInWord] = '\0';
         printf("%s\n", currentNumber);
         //logic of transforming string to number
+        printf("%d - tuc1\n", numberOfCoordinates);
         double number = strtod(currentNumber, '\0');
-        currentTriangleSidesCoordinates.coordinates[numberOfCoordinates] = number;
+        currentTriangle.coordinates[numberOfCoordinates] = number;
         printf("%lf\n", number);
         ++numberOfCoordinates;
+        printf("%d - tuc2\n", numberOfCoordinates);
         ++i;
     }
     //обрабатать что мб не числа
     if (numberOfCoordinates != 6){
-        currentTriangleSidesCoordinates.errorCode = 1;
+        printf("%d - tuuuuc\n", numberOfCoordinates);
+        currentTriangle.errorCode = 1;
+        printf("%d - tuc4567890\n", numberOfCoordinates);
     }
-    return currentTriangleSidesCoordinates;
+    printf("%d - her error\n", currentTriangle.errorCode);
+    return currentTriangle;
 }
 
+struct Triangle getSquare(struct Triangle triangle){
+    printf("im here get square");
+    if (triangle.errorCode == 0) {
+        printf("im here ger s in if");
+        double x1 = triangle.coordinates[0];
+        double y1 = triangle.coordinates[1];
+        double x2 = triangle.coordinates[2];
+        double y2 = triangle.coordinates[3];
+        double x3 = triangle.coordinates[4];
+        double y3 = triangle.coordinates[5];
+        printf("im here ger s in if after");
 
-double getSquare(struct TriangleSidesCoordinates triangle){
-    double S = 0;
-    double x1 = triangle.coordinates[0];
-    double y1 = triangle.coordinates[1];
-    double x2 = triangle.coordinates[2];
-    double y2 = triangle.coordinates[3];
-    double x3 = triangle.coordinates[4];
-    double y3 = triangle.coordinates[5];
+        printf("%lf %lf %lf %lf %lf %lf", x1, y1, x2, y2, x3, y3);
+        double S = 0.5 * abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1));
 
-    S = 0.5 * abs((x2 - x1)*(y3 - y1) - (x3 - x1)*(y2 - y1));
+        triangle.square = S;
 
-    return S;
+        if (triangle.square == 0.0)
+            triangle.errorCode = 3;
+    }
+
+    return triangle;
 }
-
 
 
 // Driver code
 int main()
 {
     char buffer[400];
-    char *message;
-    message = (char *) malloc(15 * sizeof(char));
+
     int listenfd, len;
     struct sockaddr_in servaddr, cliaddr;
     bzero(&servaddr, sizeof(servaddr));
@@ -153,12 +176,25 @@ int main()
     buffer[n] = '\0';
     printf("%s\n", buffer);
 
+    struct Triangle result = getSquare(proceedLineToCoordinates(buffer));
+    printf("imhhh here\n");
 
-    double S = getSquare(proceedLineToCoordinates(buffer));
-    printf("%lf", S);
-    ftoa(S, message, 10);
-    printf("%s\n", message);
-    // send the response
+    char *message;
+
+    if (result.errorCode == 0){
+        message = (char *) malloc(9 *sizeof(char));
+        message = "Correct";
+    } else {
+        printf("im here else\n");
+        message = (char *) malloc(9 * sizeof(char));
+        strcpy(message, "ERROR ");
+        message[6] = (char)(result.errorCode + (int)'0');
+
+        printf("%s\n", message);
+
+    }
+
     sendto(listenfd, message, MAXLINE, 0,
            (struct sockaddr*)&cliaddr, sizeof(cliaddr));
+
 }

@@ -27,7 +27,9 @@ int main()
         currentSymbol = fgetc(stdin);
         numberOfSymbolsInText++;
     }
+    inputText = (char *) realloc(inputText, (numberOfSymbolsInText + 1) * sizeof(char));
     inputText[numberOfSymbolsInText] = currentSymbol;
+    numberOfSymbolsInText++;
 
     int sockfd, n;
     struct sockaddr_in servaddr;

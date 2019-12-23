@@ -1,12 +1,17 @@
+// server program for udp connection
 #include <stdio.h>
 #define _USE_BSD 1
 #include <string.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdarg.h>
+#include<netinet/in.h>
+#include <math.h>
+#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -119,7 +124,6 @@ struct Triangle proceedLineToCoordinates(char * line){
         currentTriangle.coordinates[numberOfCoordinates] = number;
         //printf("%lf\n", number);
         ++numberOfCoordinates;
-        //printf("%d - tuc2\n", numberOfCoordinates);
         ++i;
     }
     //обрабатать что мб не числа
@@ -252,7 +256,7 @@ int errexit(const char* format,...)
 }
 
 /*
- main - connectionless multiprocess server 
+ main - connectionless multiprocess server
  */
 int main(int argc,char *argv[]){
     char *service = "echo";

@@ -90,17 +90,19 @@ int main(int argc,char *argv[])
     char recv_buff[1000];
     socklen_t addrLength;
     //sock = connectSock();
+
+    sock = socket(AF_INET, SOCK_DGRAM,0);
+    if(sock < 0)
+        errexit("can't create socket\n");
+
     struct sockaddr_in serverAddress; 					 //an internet endpoint address
     memset(&serverAddress, 0, sizeof(serverAddress));
     serverAddress.sin_family = AF_INET;   				         //family name
-    serverAddress.sin_port = htons(serverPort);                                        //port number
+    serverAddress.sin_port = htons(serverPort);//port number
+    serverAddress.sin_addr.s_addr = inet_addr(serverIP);
     inet_pton(AF_INET, serverIP, &(serverAddress.sin_addr));                         //to convert host name into 32-bit IP address
-    addrLength = sizeof(struct sockaddr);
-/* Allocate a socket */
-    sock = socket(AF_INET, SOCK_DGRAM,0);
 
-    if(sock < 0)
-        errexit("can't create socket\n");
+    addrLength = sizeof(struct sockaddr);
 
     char *inputText = NULL;
     inputText = (char*)malloc(sizeof(char));

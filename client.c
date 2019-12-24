@@ -102,10 +102,6 @@ int main(int argc,char *argv[])
     if(sock < 0)
         errexit("can't create socket\n");
 
-    if((connect(sock, (struct sockaddr *) &serverAddress, sizeof(serverAddress))) < 0) {//connect the socket
-        errexit("can't connect \n");
-        printf("no connectSock() %d\n", sock);
-    }
     char *inputText = NULL;
     inputText = (char*)malloc(sizeof(char));
     int numberOfSymbolsInText = 0;
@@ -132,6 +128,7 @@ int main(int argc,char *argv[])
     recvfrom(sock, recv_buff, MAX_RECV_BUF, 0,  (struct sockaddr *) &serverAddress, &addrLength);
     puts(recv_buff);
 
+    close(sock);
 
     exit(0); //*/
 

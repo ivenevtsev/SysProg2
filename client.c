@@ -29,134 +29,98 @@
 
 char *serverIP = "127.0.0.1";
 int serverPort = 8088;
+int sock;
 //FILE *logFile;
-
-
-extern int errno;
-int errexit(const char *format,...);
-int connectUDP(const char *service,const char *host,int portnum);
-int connectsock(const char *service,const char *host,int portnum,const char *transport);
-
-/*------------------------------------------------------------------------------------
- * connectsock-Allocate and connect socket for UDP
- *------------------------------------------------------------------------------------
-*/
-
-int connectsock(const char *service,const char *host,int portnum,const char *transport){
-    printf("connectsock\n");
-    /*
-    Arguments:
-    *service   - service associated with desired port
-    *host      - name of the host to which connection is desired
-    *transport - name of the transport protocol to use
-*/ 
-
-    struct sockaddr_in sin; 					 //an internet endpoint address
-    int s,type;               					 //socket descriptor and socket type
-    memset(&sin,0,sizeof(sin));
-    sin.sin_family=AF_INET;   				         //family name
-    sin.sin_port=htons(portnum);                                        //port number
-    inet_pton(AF_INET,host,&(sin.sin_addr));                         //to convert host name into 32-bit IP address
- 
-/*
- * to determine the type of socket
- */
-    if(strcmp(transport,"udp")==0)
-        type=SOCK_DGRAM;
-    else
-        type=SOCK_STREAM;
-
-/* Allocate a socket */
-    s=socket(AF_INET,type,0);
-    if(s<0)
-        errexit("can't create socket : %s\n",strerror(errno));
-
-    if((connect(s,(struct sockaddr *) &sin,sizeof(sin)))<0)        //connect the socket
-        errexit("can't connect to %s.%s: %s\n",host,service,strerror(errno));
-
-    return s;
-}
-
-/*
- * errexit- print and error message and exit
- */
-
 
 int errexit(const char* format,...){
     printf("errexit\n");
     va_list args;
 
     va_start(args,format);
-    vfprintf(stderr,format,args);
+    vfprintf(stderr, format, args);
     va_end(args);
     exit(1);
 }
 
+int connectSock(){
 
-/*------------------------------------------------------------------------
- * connectUDP-connect to a specified UDP service on specified host
- -------------------------------------------------------------------------*/
+    struct sockaddr_in sin; 					 //an internet endpoint address
+    int s;               					 //socket descriptor and socket type
+    memset(&sin, 0, sizeof(sin));
+    sin.sin_family = AF_INET;   				         //family name
+    sin.sin_port = htons(serverPort);                                        //port number
+    inet_pton(AF_INET, serverIP, &(sin.sin_addr));                         //to convert host name into 32-bit IP address
 
-int connectUDP(const char *service,const char *host,int portnum)
-{
-    printf("connectUDP\n");
-/*
- Arguments:
- *service-service associated with desired port
- *host-name of the host to which connection is desired
- */
+/* Allocate a socket */
+    s = socket(AF_INET, SOCK_DGRAM,0);
+    if(s < 0)
+       errexit("can't create socket\n");
 
-    return connectsock(service,host,portnum,"udp");
+    if((connect(s, (struct sockaddr *) &sin, sizeof(sin))) < 0)        //connect the socket
+       errexit("can't connect \n");
+    printf("connectSock()\n");
+    return s;
 }
 
 
-/*
- main - UDP client file
- */ 
+
+
 
 int main(int argc,char *argv[])
 {
+    char *help = "\033[1mNAME\033[0m\n\tParadist - Client which is connected to TCP Server (Karatist) to send him string with numbers and receive if there are Central polygonal numbers in there\n"
+                 "\033[1mSYNOPSIS\033[0m\n\t Paradist [OPTIONS]\n"
+                 "\033[1mDESCRIPTION\033[0m\n"
+                 "\t-a=IP\n\t\tset server listening IP\n"
+                 "\t-p=PORT\n\t\tset server listening PORT\n"
+                 "\t-v\n\t\tcheck program version\n"
+                 "\t-h\n\t\tprint help\n";
 
-    char *file_name;
-    ssize_t recv_bytes;
+    int rez;
+    if (getenv("L2ADDR") != NULL) {
+        serverIP = getenv("L2ADDR");
+    }
+    if (getenv("L2PORT") != NULL) {
+        serverPort = atoi(getenv("L2PORT"));
+    }
+
+    while ((rez = getopt(argc, argv, "a:p:vh")) != -1) {
+        switch (rez) {
+            case 'a':
+                if (strncmp(optarg, "", 1) == 0) {
+                    printf("%s", help);
+                    return 0;
+                }
+                serverIP = optarg;
+                break;
+            case 'p':
+                if (strncmp(optarg, "", 1) == 0) {
+                    printf("%s", help);
+                    return 0;
+                }
+                serverPort = atoi(optarg);
+                break;
+            case 'v':
+                printf("version 34.0\n");
+                return 0;
+            default:
+                printf("%s", help);
+                return 0;
+        }
+    }
+
     char recv_buff[1000];
 
-    char *service="time";                                               //default service port
-    int sockfd;                                                           //socket descriptor
-
-   /* switch(argc)
-    {
-        case 1:
-            host="localhost";
-            printf("case 1\n");
-        break;
-
-        case 2:
-            host="localhost";
-            printf("case 2\n");
-        break;
-        case 4:
-            printf("case 1\n");
-            file_name=argv[3];
-            portnum=atoi(argv[2]);
-            host=argv[1];
-        break;
-
-         default:
-             printf("Error in taking arguments\n");
-             exit(1); // */
-
-
-
     struct sockaddr_in fsin;
-
-    sockfd = connectUDP(service, serverIP, serverPort);
-
-    //char buffer[100]; //recv_buff
+    int alen = sizeof(fsin);
+    sock = connectSock();
 
     char *inputText = NULL;
     inputText = (char*)malloc(sizeof(char));
     int numberOfSymbolsInText = 0;
+
+    printf("waiting for data\n");
+
     char currentSymbol = fgetc(stdin);
 
     while (currentSymbol != '\n')//чтение
@@ -169,16 +133,13 @@ int main(int argc,char *argv[])
     inputText = (char *) realloc(inputText, (numberOfSymbolsInText + 1) * sizeof(char));
     inputText[numberOfSymbolsInText] = currentSymbol;
     numberOfSymbolsInText++;
-
-
-    //struct sockaddr_in servaddr;
-
-
+    printf("%s\n", inputText);
 // request to send datagram
 // no need to specify server address in sendto
 // connect stores the peers IP and port
-    sendto(sockfd, inputText, numberOfSymbolsInText, 0, (struct sockaddr*)NULL, sizeof(fsin));
-    recvfrom(sockfd, recv_buff, MAX_RECV_BUF, 0,  (struct sockaddr*)NULL, NULL);
+    sendto(sock, inputText, numberOfSymbolsInText, 0, (struct sockaddr*)&fsin, sizeof(fsin));
+    printf("%s\n", inputText);
+    recvfrom(sock, recv_buff, MAX_RECV_BUF, 0,  (struct sockaddr*) &fsin, &alen);
     printf("%s\n", recv_buff);
     puts(recv_buff);
 

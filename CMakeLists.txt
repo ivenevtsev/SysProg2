@@ -3,4 +3,4 @@ project(SysProg2 C)
 
 set(CMAKE_C_STANDARD 99)
 
-add_executable(SysProg2 client.c)
+add_executable(SysProg2 server.c)

@@ -42,29 +42,6 @@ int errexit(const char* format,...){
     exit(1);
 }
 
-int connectSock(){
-
-    struct sockaddr_in sin; 					 //an internet endpoint address
-    int s;               					 //socket descriptor and socket type
-    memset(&sin, 0, sizeof(sin));
-    sin.sin_family = AF_INET;   				         //family name
-    sin.sin_port = htons(serverPort);                                        //port number
-    inet_pton(AF_INET, serverIP, &(sin.sin_addr));                         //to convert host name into 32-bit IP address
-
-/* Allocate a socket */
-    s = socket(AF_INET, SOCK_DGRAM,0);
-    if(s < 0)
-       errexit("can't create socket\n");
-
-    if((connect(s, (struct sockaddr *) &sin, sizeof(sin))) < 0)        //connect the socket
-       errexit("can't connect \n");
-    printf("connectSock()\n");
-    return s;
-}
-
-
-
-
 
 int main(int argc,char *argv[])
 {
@@ -77,6 +54,7 @@ int main(int argc,char *argv[])
                  "\t-h\n\t\tprint help\n";
 
     int rez;
+
     if (getenv("L2ADDR") != NULL) {
         serverIP = getenv("L2ADDR");
     }
@@ -110,11 +88,24 @@ int main(int argc,char *argv[])
     }
 
     char recv_buff[1000];
+    socklen_t addrLength;
+    //sock = connectSock();
+    struct sockaddr_in serverAddress; 					 //an internet endpoint address
+    memset(&serverAddress, 0, sizeof(serverAddress));
+    serverAddress.sin_family = AF_INET;   				         //family name
+    serverAddress.sin_port = htons(serverPort);                                        //port number
+    inet_pton(AF_INET, serverIP, &(serverAddress.sin_addr));                         //to convert host name into 32-bit IP address
+    addrLength = sizeof(struct sockaddr);
+/* Allocate a socket */
+    sock = socket(AF_INET, SOCK_DGRAM,0);
 
-    struct sockaddr_in fsin;
-    int alen = sizeof(fsin);
-    sock = connectSock();
+    if(sock < 0)
+        errexit("can't create socket\n");
 
+    if((connect(sock, (struct sockaddr *) &serverAddress, sizeof(serverAddress))) < 0) {//connect the socket
+        errexit("can't connect \n");
+        printf("no connectSock() %d\n", sock);
+    }
     char *inputText = NULL;
     inputText = (char*)malloc(sizeof(char));
     int numberOfSymbolsInText = 0;
@@ -133,19 +124,13 @@ int main(int argc,char *argv[])
     inputText = (char *) realloc(inputText, (numberOfSymbolsInText + 1) * sizeof(char));
     inputText[numberOfSymbolsInText] = currentSymbol;
     numberOfSymbolsInText++;
-    printf("%s\n", inputText);
 // request to send datagram
 // no need to specify server address in sendto
 // connect stores the peers IP and port
-    sendto(sock, inputText, numberOfSymbolsInText, 0, (struct sockaddr*)&fsin, sizeof(fsin));
-    printf("%s\n", inputText);
-    recvfrom(sock, recv_buff, MAX_RECV_BUF, 0,  (struct sockaddr*) &fsin, &alen);
-    printf("%s\n", recv_buff);
+    sendto(sock, inputText, numberOfSymbolsInText, 0, (const struct sockaddr *) &serverAddress, addrLength);
+
+    recvfrom(sock, recv_buff, MAX_RECV_BUF, 0,  (struct sockaddr *) &serverAddress, &addrLength);
     puts(recv_buff);
-
-
-// close the descriptor
-    //close(sockfd);
 
 
     exit(0); //*/

@@ -232,9 +232,9 @@ int connectSock()
     printf("connectsock\n");
     struct sockaddr_in server;                                                //an internet endpoint address
 
-    int server_socket,type,b;                             //two socket descriptors for listening and accepting
+    int server_socket, type, b;                             //two socket descriptors for listening and accepting
 
-    memset(&server,0,sizeof(server));
+    memset(&server, 0, sizeof(server));
 
     server.sin_addr.s_addr= htons(INADDR_ANY);                                 //INADDR_ANY to match any IP address
     server.sin_family = AF_INET;                                                //family name
@@ -243,7 +243,7 @@ int connectSock()
  * to determine the type of socket
  */  type=SOCK_DGRAM;
 
-    server_socket = socket(AF_INET,type,0);                                    //allocate a socket
+    server_socket = socket(AF_INET, type, 0);                                    //allocate a socket
 
     if(server_socket<0)
     {
@@ -411,22 +411,46 @@ int main(int argc,char *argv[]){
        once the call returns call accept on listening socket to accept the incoming requests
      */
 
-    sock = connectSock();
+   // sock = connectSock();
+
+    printf("connectsock\n");
+    struct sockaddr_in server;                                                //an internet endpoint address
+
+    memset(&server, 0, sizeof(server));
+
+    server.sin_addr.s_addr= htons(INADDR_ANY);                                 //INADDR_ANY to match any IP address
+    server.sin_family = AF_INET;                                                //family name
+    server.sin_port = htons(serverPort);                                              //port number
+
+    sock = socket(AF_INET, SOCK_DGRAM, 0);                                    //allocate a socket
+
+    if(sock<0)
+    {
+        printf("Socket can't be created\n");
+        exit(0);
+    }
+
+/* to set the socket options- to reuse the given port multiple times */
+    int enable = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        printf("setsockopt(SO_REUSEADDR) failed");
+        exit(0);
+    }
+
+/* bind the socket to known port */
+    if(bind(sock, (struct sockaddr*)&server, sizeof(server)) < 0)
+    {
+        printf("Error in binding\n");
+        exit(0);
+    }
+
     printf("Listening to client\n");
 
-   // (void) signal(SIGCHLD, handler);
-
-
     while (1) {
-        struct sockaddr_in fsin;
-        printf("while\n");
-        int alen = sizeof(fsin);
+        socklen_t addrLength = sizeof(struct sockaddr);
 
         int data_len;
-
-        printf("%s %d\n", data, data_len);
-        data_len = recvfrom(sock, data, MAX_DATA, 0, (struct sockaddr *) &fsin, &alen);
-        printf("%s %d\n", data, data_len);
+        data_len = recvfrom(sock, data, MAX_DATA, 0, (struct sockaddr*)&server, &addrLength);
         if (data_len) {
             printf("connected to multiforked connectionless server\n");
             printf("File name recieved: %s\n", data);
@@ -435,7 +459,6 @@ int main(int argc,char *argv[]){
                 case 0:
                 {/* child */
                         struct Triangle result = getSquare(proceedLineToCoordinates(data));
-                        printf("imhhh here\n");
 
                         char *message;
 
@@ -452,9 +475,8 @@ int main(int argc,char *argv[]){
                             //printf("%s\n", message);
 
                         }
-                        printf("%s\n", message);
-                        sendto(sock, message, MAXLINE, 0, (struct sockaddr *) &fsin, alen);
-                        printf("%s\n", message);
+                        sendto(sock, message, MAXLINE, 0, (struct sockaddr*)&server, addrLength);
+                        printf("result %s\n", message);
 
                         printf("\nclient disconnected\n");
                 }

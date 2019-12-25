@@ -27,6 +27,37 @@ int serverPort = 8088;
 int delay = 0;
 clock_t begin;
 
+void check(int ret) {
+    if (ret < 0) {
+        fprintf(stderr, "ERROR: failed to set proc mask: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+}
+
+char *currentTimestamp() {
+    time_t timer;
+    char *buffer = (char *) malloc(sizeof(char) * 26);
+    struct tm *tm_info;
+    time(&timer);
+    tm_info = localtime(&timer);
+    strftime(buffer, 26, "%d.%m.%Y %H:%M:%S", tm_info);
+    return buffer;
+}
+FILE *logFile;
+
+void error(char *err) {
+    if (logFile == NULL) {
+        printf("%s\t%s\n", currentTimestamp(), err);
+        fflush(stdin);
+    } else {
+        fprintf(logFile, "%s\t%s\n", currentTimestamp(), err);
+        fflush(logFile);
+        fclose(logFile);
+    }
+    perror(err);
+    exit(1);
+}
+
 void reverse(char* str, int len)
 {
     int i = 0, j = len - 1, temp;
@@ -87,53 +118,49 @@ struct Triangle proceedLineToCoordinates(char * line){
     struct Triangle currentTriangle;
     currentTriangle.errorCode = 0;
     currentTriangle.square = 0.0;
-    for (int i = 0; i < 6; i++){
-        currentTriangle.coordinates[i] = 0;
+    for (int j = 0; j < 6; j++){
+        currentTriangle.coordinates[j] = 0;
     }
     int numberOfCoordinates = 0;
     printf("%s\n", line);
     int i = 0, maxi = strlen(line);
-    //printf("%d - maxi\n", maxi);
-    while ( i < maxi){ //&& line[i] != '\n' && line[i] != '\0'){
-        //printf("%d - tuc4\n", numberOfCoordinates);
+    while ( i < maxi){
         if (numberOfCoordinates == 6){
+            //printf("here error %d %d %d\n", numberOfCoordinates, i, maxi);
             currentTriangle.errorCode = 1;
-            break;
+            error("ERROR 1 format");
         }
         char *currentNumber = NULL;
         currentNumber = (char *) malloc(sizeof(char));
 
         int numberOfSymbolsInWord = 0;
-        //printf("%d - i\n", i);
-        while (i < maxi && line[i] != ' ' && line[i] != '\n' && line[i] != '\0' ) {// доделать
-            //printf("%d - tuc3\n", numberOfCoordinates);
+        while (i < maxi && line[i] != ' ' && line[i] != '\n' && line[i] != '\0' && line[i] != '\t' ) {// доделать
             currentNumber = (char *) realloc(currentNumber, (numberOfSymbolsInWord + 1) * sizeof(char));
             currentNumber[numberOfSymbolsInWord] = line[i];
-
+            if (line[i] > '9' || line[i] < '0'){
+                currentTriangle.errorCode = 4;
+                error("ERROR 4 not a digit");
+            }
             ++numberOfSymbolsInWord;
             ++i;
-            //printf("%d - tuc3\n", numberOfCoordinates);
         }
-
         currentNumber = (char *) realloc(currentNumber, (numberOfSymbolsInWord + 1) * sizeof(char));
         currentNumber[numberOfSymbolsInWord] = '\0';
-        //printf("%s\n", currentNumber);
-        //logic of transforming string to number
-        //printf("%d - tuc1\n", numberOfCoordinates);
+
         double number = strtod(currentNumber, '\0');
+        printf("cord %lf #%d\n", number, numberOfCoordinates);
         currentTriangle.coordinates[numberOfCoordinates] = number;
-        //printf("%lf\n", number);
         ++numberOfCoordinates;
-        //printf("%d - tuc2\n", numberOfCoordinates);
-        ++i;
+        do{
+            ++i;
+            printf("i %d\n", i);
+        }while (i < maxi && (line[i] == '\n' || line[i] == ' ' || line[i] == '\t' || line[i] == '\0'));
     }
     //обрабатать что мб не числа
     if (numberOfCoordinates != 6){
-        printf("%d - tuuuuc\n", numberOfCoordinates);
         currentTriangle.errorCode = 1;
-        printf("%d - tuc4567890\n", numberOfCoordinates);
+        error("ERROR 1 format");
     }
-    //printf("%d - her error\n", currentTriangle.errorCode);
     return currentTriangle;
 }
 
@@ -156,48 +183,16 @@ struct Triangle getSquare(struct Triangle triangle){
 
         if (triangle.square == 0.0)
             triangle.errorCode = 3;
+            error("ERROR 3 not a triangle");
     }
 
     return triangle;
 }
 
-FILE *logFile;
-
-
-
-void check(int ret) {
-    if (ret < 0) {
-        fprintf(stderr, "ERROR: failed to set proc mask: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-}
-
-char *currentTimestamp() {
-    time_t timer;
-    char *buffer = (char *) malloc(sizeof(char) * 26);
-    struct tm *tm_info;
-    time(&timer);
-    tm_info = localtime(&timer);
-    strftime(buffer, 26, "%d.%m.%Y %H:%M:%S", tm_info);
-    return buffer;
-}
-
-void error(char *err) {
-    if (logFile == NULL) {
-        printf("%s\t%s\n", currentTimestamp(), err);
-        fflush(stdin);
-    } else {
-        fprintf(logFile, "%s\t%s\n", currentTimestamp(), err);
-        fflush(logFile);
-        fclose(logFile);
-    }
-    perror(err);
-    exit(1);
-}
 
 void quit() {
-    printf("\n%s\tР—Р°РІРµСЂС€РµРЅРёРµ СЂР°Р±РѕС‚С‹ СЃРµСЂРІРµСЂР°\n", currentTimestamp());
-    fprintf(logFile, "%s\tР—Р°РІРµСЂС€РµРЅРёРµ СЂР°Р±РѕС‚С‹ СЃРµСЂРІРµСЂР°\n", currentTimestamp());
+    printf("\n%s\tЗавершение работы сервера\n", currentTimestamp());
+    fprintf(logFile, "%s\tЗавершение работы сервера\n", currentTimestamp());
     fflush(logFile);
     fflush(stdin);
     close(sock);
@@ -208,64 +203,21 @@ void quit() {
 void quitWithLog() {
     clock_t end = clock();
     double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
-    fprintf(logFile, "Р—Р°РІРµСЂС€РµРЅРёРµ СЂР°Р±РѕС‚С‹ СЃРµСЂРІРµСЂР°.\n"
-                     "РЎРµСЂРІРµСЂ СЂР°Р±РѕС‚Р°Р»: %f СЃ\n"
-                     "РћР±СЃР»СѓР¶РµРЅРЅС‹Рµ Р·Р°РїСЂРѕСЃС‹: %d\n"
-                     "РўРµРєСѓС‰РµРµ РІСЂРµРјСЏ: %s\n"
-                     "РљРѕР»РёС‡РµСЃС‚РІРѕ РѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹С… Р·Р°РїСЂРѕСЃРѕРІ: %d\n"
-                     "РљРѕР»РёС‡РµСЃС‚РІРѕ РѕС€РёР±РѕС‡РЅС‹С… Р·Р°РїСЂРѕСЃРѕРІ Р·Р°РїСЂРѕСЃРѕРІ: %d\n", time_spent, count, currentTimestamp(), good, bad);
-    printf("Р—Р°РІРµСЂС€РµРЅРёРµ СЂР°Р±РѕС‚С‹ СЃРµСЂРІРµСЂР°.\n"
-           "РЎРµСЂРІРµСЂ СЂР°Р±РѕС‚Р°Р»: %f СЃ\n"
-           "РћР±СЃР»СѓР¶РµРЅРЅС‹Рµ Р·Р°РїСЂРѕСЃС‹: %d\n"
-           "РўРµРєСѓС‰РµРµ РІСЂРµРјСЏ: %s\n"
-           "РљРѕР»РёС‡РµСЃС‚РІРѕ РѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹С… Р·Р°РїСЂРѕСЃРѕРІ: %d\n"
-           "РљРѕР»РёС‡РµСЃС‚РІРѕ РѕС€РёР±РѕС‡РЅС‹С… Р·Р°РїСЂРѕСЃРѕРІ Р·Р°РїСЂРѕСЃРѕРІ: %d\n", time_spent, count, currentTimestamp(), good, bad);
+    fprintf(logFile, "Завершение работы сервера.\n"
+    "Сервер работал: %f\n"
+    "Обслуженные запросы: %d\n"
+    "Текущее время: %s\n"
+    "Количество обработанных запросов: %d\n"
+    "Количество ошибочных запросов запросов:%d\n", time_spent, count, currentTimestamp(), good, bad);
+    printf("Завершение работы сервера.\n"
+           "Сервер работал: %f\n"
+           "Обслуженные запросы: %d\n"
+           "Текущее время: %s\n"
+           "Количество обработанных запросов: %d\n"
+           "Количество ошибочных запросов запросов:%d\n", time_spent, count, currentTimestamp(), good, bad);
     fflush(logFile);
     fflush(stdin);
     fflush(stdin);
-}
-
-extern int errno;
-
-int connectSock()
-{
-    printf("connectsock\n");
-    struct sockaddr_in server;                                                //an internet endpoint address
-
-    int server_socket, type, b;                             //two socket descriptors for listening and accepting
-
-    memset(&server, 0, sizeof(server));
-
-    server.sin_addr.s_addr= htons(INADDR_ANY);                                 //INADDR_ANY to match any IP address
-    server.sin_family = AF_INET;                                                //family name
-    server.sin_port = htons(serverPort);                                              //port number
-/*
- * to determine the type of socket
- */  type=SOCK_DGRAM;
-
-    server_socket = socket(AF_INET, type, 0);                                    //allocate a socket
-
-    if(server_socket<0)
-    {
-        printf("Socket can't be created\n");
-        exit(0);
-    }
-
-/* to set the socket options- to reuse the given port multiple times */
-    int enable = 1;
-    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-        printf("setsockopt(SO_REUSEADDR) failed");
-        exit(0);
-    }
-
-/* bind the socket to known port */
-    if(bind(server_socket,(struct sockaddr*)&server,sizeof(server)) < 0)
-    {
-        printf("Error in binding\n");
-        exit(0);
-    }
-
-    return server_socket;
 }
 
 
@@ -291,8 +243,8 @@ int errexit(const char* format,...)
  main - connectionless multiprocess server 
  */
 int main(int argc,char *argv[]){
-    char *help = "\033[1mNAME\033[0m\n\tKaratist - TCP server, which checks if there are Central polygonal numbers in the string\n"
-                 "\033[1mSYNOPSIS\033[0m\n\t Karatist [OPTIONS]\n"
+    char *help = "\033[1mNAME\033[0m\n\t - UDP server, that calculate square\n"
+                 "\033[1mSYNOPSIS\033[0m\n\t[OPTIONS]\n"
                  "\033[1mDESCRIPTION\033[0m\n"
                  "\t-w=N\n\t\tset delay N for client \n"
                  "\t-d\n\t\tdaemon mode\n"
@@ -360,7 +312,7 @@ int main(int argc,char *argv[]){
                 serverPort = atoi(optarg);
                 break;
             case 'v':
-                printf("\033[1mKaratist version 2.14,5 \"Rasskazat\'?\"\033[0m\n");
+                printf("\033version 36\n");
                 return 0;
             default:
                 printf("%s", help);
@@ -372,7 +324,7 @@ int main(int argc,char *argv[]){
         pid_t pid, sid;
         pid = fork();
         if (pid < 0) {
-            error("ERROR 99: Fork failed ");
+            error("ERROR 99 Fork failed ");
         }
         if (pid > 0) {
             exit(0);
@@ -380,12 +332,12 @@ int main(int argc,char *argv[]){
 
         sid = setsid();
         if (sid < 0) {
-            error("ERROR 98: SID failed ");
+            error("ERROR 98 SID failed ");
         }
         signal(SIGCHLD, SIG_IGN);
         signal(SIGHUP, SIG_IGN);
         if ((pid = fork()) < 0) {
-            error("ERROR 99: Fork failed ");
+            error("ERROR 99 Fork failed ");
         }
         if (pid > 0) {
             exit(0);
@@ -404,14 +356,6 @@ int main(int argc,char *argv[]){
         }
 
     }
-
-    char data[1000];
-
-    /* call connectTCP to create a socket, bind it and place it in passive mode
-       once the call returns call accept on listening socket to accept the incoming requests
-     */
-
-   // sock = connectSock();
 
     printf("connectsock\n");
     struct sockaddr_in server;                                                //an internet endpoint address
@@ -449,44 +393,55 @@ int main(int argc,char *argv[]){
     while (1) {
         socklen_t addrLength = sizeof(struct sockaddr);
 
-        int data_len;
-        data_len = recvfrom(sock, data, MAX_DATA, 0, (struct sockaddr*)&server, &addrLength);
-        if (data_len) {
-            printf("connected to multiforked connectionless server\n");
-            printf("File name recieved: %s\n", data);
+        char data[MAX_DATA];
+        memset(data, 0, MAX_DATA);
+        int messLength = 0;
+        messLength = recvfrom(sock, (char *)data, sizeof(data), 0,  (struct sockaddr *) &server, &addrLength);
 
-            switch (fork()) {
-                case 0:
-                {/* child */
-                        struct Triangle result = getSquare(proceedLineToCoordinates(data));
+        printf("len %d\n", messLength);
 
-                        char *message;
+        if (data == NULL) {
+            error("ERROR 52: Malloc failed");
+        }
 
-                        if (result.errorCode == 0){
-                            message = (char *) malloc(20 *sizeof(char));
-                            ftoa(result.square, message, 3);
-                            //message = "Correct";
-                        } else {
-                            //printf("im here else\n");
-                            message = (char *) malloc(9 * sizeof(char));
-                            strcpy(message, "ERROR ");
-                            message[6] = (char)(result.errorCode + (int)'0');
+        printf("recieved: %s\n", data);
+        sleep(delay); //Если необходима задержка
 
-                            //printf("%s\n", message);
+        //  fprintf(logFile, "\n%s\tMessage %s received from(%s , %d)\n", currentTimestamp(), data,
+        //        inet_ntoa(args.clientAddress.sin_addr),
+        //      ntohs(args.clientAddress.sin_port)); // Запись в лог файл полученного сообщения
 
-                        }
-                        sendto(sock, message, MAXLINE, 0, (struct sockaddr*)&server, addrLength);
-                        printf("result %s\n", message);
+        switch (fork()) {
+            case 0: {/* child */
+                struct Triangle result = getSquare(proceedLineToCoordinates(data));
 
-                        printf("\nclient disconnected\n");
+                char *message;
+
+                if (result.errorCode == 0) {
+                    message = (char *) malloc(20 * sizeof(char));
+                    ftoa(result.square, message, 3);
+                    //message = "Correct";
+                } else {
+                    //printf("im here else\n");
+                    message = (char *) malloc(9 * sizeof(char));
+                    strcpy(message, "ERROR ");
+                    message[6] = (char) (result.errorCode + (int) '0');
+
+                    //printf("%s\n", message);
+
                 }
+                sendto(sock, message, MAXLINE, 0, (struct sockaddr *) &server, addrLength);
+                printf("result %s\n", message);
 
-                default: /* parent */
-                    break;
-                case -1:
-                    printf("error in forking\n");
+                printf("\nclient disconnected\n");
             }
+
+            default: /* parent */
+                break;
+            case -1:
+                printf("error in forking\n");
         }
     }
+
     return 0;
 }

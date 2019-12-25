@@ -24,8 +24,7 @@
 #define INADDR_NONE 0xffffffff
 #endif
 
-#define MAX_RECV_BUF 1000
-#define MAX_SEND_BUF 1000
+#define MAX_DATA 1000
 
 char *serverIP = "127.0.0.1";
 int serverPort = 8088;
@@ -45,8 +44,8 @@ int errexit(const char* format,...){
 
 int main(int argc,char *argv[])
 {
-    char *help = "\033[1mNAME\033[0m\n\tParadist - Client which is connected to TCP Server (Karatist) to send him string with numbers and receive if there are Central polygonal numbers in there\n"
-                 "\033[1mSYNOPSIS\033[0m\n\t Paradist [OPTIONS]\n"
+    char *help = "\033[1mNAME\033[0m\n\t - UDP client, that send coordinates to server, that calculate square\n"
+                 "\033[1mSYNOPSIS\033[0m\n\t[OPTIONS]\n"
                  "\033[1mDESCRIPTION\033[0m\n"
                  "\t-a=IP\n\t\tset server listening IP\n"
                  "\t-p=PORT\n\t\tset server listening PORT\n"
@@ -87,9 +86,7 @@ int main(int argc,char *argv[])
         }
     }
 
-    char recv_buff[1000];
     socklen_t addrLength;
-    //sock = connectSock();
 
     sock = socket(AF_INET, SOCK_DGRAM,0);
     if(sock < 0)
@@ -125,13 +122,20 @@ int main(int argc,char *argv[])
 // request to send datagram
 // no need to specify server address in sendto
 // connect stores the peers IP and port
+    printf("%s\n", inputText);
+
     sendto(sock, inputText, numberOfSymbolsInText, 0, (const struct sockaddr *) &serverAddress, addrLength);
+    printf("%s\n", inputText);
 
-    recvfrom(sock, recv_buff, MAX_RECV_BUF, 0,  (struct sockaddr *) &serverAddress, &addrLength);
-    puts(recv_buff);
+    char answer[MAX_DATA];
 
+    int longOf = recvfrom(sock, answer, MAX_DATA, 0, // Получаем ответ на наш вопрос от сервера
+             (struct sockaddr *) &serverAddress, &addrLength);
+
+    printf("Server answer: %s\n", answer); // Вывод ответа
+
+    inputText = NULL;
+    free(inputText);
     close(sock);
-
     exit(0); //*/
-
 }

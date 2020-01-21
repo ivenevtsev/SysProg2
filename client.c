@@ -31,13 +31,9 @@ int serverPort = 8088;
 int sock;
 //FILE *logFile;
 
-int errexit(const char* format,...){
-    printf("errexit\n");
-    va_list args;
-
-    va_start(args,format);
-    vfprintf(stderr, format, args);
-    va_end(args);
+void error(char *err) { // Вывод ошибок в терминал
+    printf("%s\n", err);
+    perror(err);
     exit(1);
 }
 
@@ -90,7 +86,7 @@ int main(int argc,char *argv[])
 
     sock = socket(AF_INET, SOCK_DGRAM,0);
     if(sock < 0)
-        errexit("can't create socket\n");
+        error("can't create socket\n");
 
     struct sockaddr_in serverAddress; 					 //an internet endpoint address
     memset(&serverAddress, 0, sizeof(serverAddress));
@@ -100,12 +96,11 @@ int main(int argc,char *argv[])
     inet_pton(AF_INET, serverIP, &(serverAddress.sin_addr));                         //to convert host name into 32-bit IP address
 
     addrLength = sizeof(struct sockaddr);
-
     char *inputText = NULL;
     inputText = (char*)malloc(sizeof(char));
     int numberOfSymbolsInText = 0;
 
-    printf("waiting for data\n");
+    printf("Waiting for data\n");
 
     char currentSymbol = fgetc(stdin);
 
@@ -122,14 +117,10 @@ int main(int argc,char *argv[])
 // request to send datagram
 // no need to specify server address in sendto
 // connect stores the peers IP and port
-    printf("%s\n", inputText);
-
     sendto(sock, inputText, numberOfSymbolsInText, 0, (const struct sockaddr *) &serverAddress, addrLength);
-    printf("%s\n", inputText);
-
     char answer[MAX_DATA];
 
-    int longOf = recvfrom(sock, answer, MAX_DATA, 0, // Получаем ответ на наш вопрос от сервера
+    recvfrom(sock, answer, MAX_DATA, 0, // Получаем ответ на наш вопрос от сервера
              (struct sockaddr *) &serverAddress, &addrLength);
 
     printf("Server answer: %s\n", answer); // Вывод ответа
